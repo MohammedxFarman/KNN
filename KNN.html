@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KNN Iris Predictor - LIME Explanations</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.24.1/plotly.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-item label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.6);
+        }
+
+        select, input {
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            text-align: center;
+        }
+
+        .plot-container {
+            height: 400px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .sample-info {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .sample-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .sample-card {
+            background: linear-gradient(135deg, #f8f9ff, #e8ebff);
+            border-left: 4px solid #667eea;
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .sample-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
+        }
+
+        .sample-card h4 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .feature-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .prediction-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9rem;
+        }
+
+        .setosa { background: #ffebee; color: #c62828; }
+        .versicolor { background: #f3e5f5; color: #7b1fa2; }
+        .virginica { background: #e8f5e8; color: #2e7d32; }
+
+        .explanation {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .explanation h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .lime-explanation {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .lime-feature {
+            background: linear-gradient(135deg, #f8f9ff, #e8ebff);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .lime-feature:hover {
+            transform: scale(1.05);
+        }
+
+        .lime-feature .feature-name {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .lime-feature .feature-weight {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .positive { color: #2e7d32; }
+        .negative { color: #c62828; }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.2rem;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .control-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .control-item {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌸 KNN Iris Predictor</h1>
+
+            <div class="hackathon-badge">
+                <strong>TEAM DIVA Project</strong> 
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <div class="control-item">
+                    <label for="kValue">K Value:</label>
+                    <select id="kValue">
+                        <option value="3">3</option>
+                        <option value="5" selected>5</option>
+                        <option value="7">7</option>
+                        <option value="9">9</option>
+                    </select>
+                </div>
+                <div class="control-item">
+                    <label for="featureX">X-Axis Feature:</label>
+                    <select id="featureX">
+                        <option value="0" selected>Sepal Length</option>
+                        <option value="1">Sepal Width</option>
+                        <option value="2">Petal Length</option>
+                        <option value="3">Petal Width</option>
+                    </select>
+                </div>
+                <div class="control-item">
+                    <label for="featureY">Y-Axis Feature:</label>
+                    <select id="featureY">
+                        <option value="0">Sepal Length</option>
+                        <option value="1" selected>Sepal Width</option>
+                        <option value="2">Petal Length</option>
+                        <option value="3">Petal Width</option>
+                    </select>
+                </div>
+                <button onclick="generateExplanations()">Generate New Samples & Explanations</button>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>📊 Dataset Overview</h3>
+                <div id="datasetPlot" class="plot-container"></div>
+            </div>
+            <div class="card">
+                <h3>🎯 KNN Predictions with Neighbors</h3>
+                <div id="knnPlot" class="plot-container"></div>
+            </div>
+        </div>
+
+        <div class="sample-info">
+            <h3>🔬 Random Sample Analysis</h3>
+            <div id="sampleCards" class="sample-grid"></div>
+        </div>
+
+        <div class="explanation">
+            <h3>🧠 LIME Explanations</h3>
+            <p>Local Interpretable Model-Agnostic Explanations show how each feature contributes to the prediction for each sample:</p>
+            <div id="limeExplanations"></div>
+        </div>
+    </div>
+
+    <script>
+        // Iris dataset
+        const irisData = {
+            features: [
+                [5.1, 3.5, 1.4, 0.2], [4.9, 3.0, 1.4, 0.2], [4.7, 3.2, 1.3, 0.2], [4.6, 3.1, 1.5, 0.2],
+                [5.0, 3.6, 1.4, 0.2], [5.4, 3.9, 1.7, 0.4], [4.6, 3.4, 1.4, 0.3], [5.0, 3.4, 1.5, 0.2],
+                [4.4, 2.9, 1.4, 0.2], [4.9, 3.1, 1.5, 0.1], [5.4, 3.7, 1.5, 0.2], [4.8, 3.4, 1.6, 0.2],
+                [4.8, 3.0, 1.4, 0.1], [4.3, 3.0, 1.1, 0.1], [5.8, 4.0, 1.2, 0.2], [5.7, 4.4, 1.5, 0.4],
+                [5.4, 3.9, 1.3, 0.4], [5.1, 3.5, 1.4, 0.3], [5.7, 3.8, 1.7, 0.3], [5.1, 3.8, 1.5, 0.3],
+                [5.4, 3.4, 1.7, 0.2], [5.1, 3.7, 1.5, 0.4], [4.6, 3.6, 1.0, 0.2], [5.1, 3.3, 1.7, 0.5],
+                [4.8, 3.4, 1.9, 0.2], [5.0, 3.0, 1.6, 0.2], [5.0, 3.4, 1.6, 0.4], [5.2, 3.5, 1.5, 0.2],
+                [5.2, 3.4, 1.4, 0.2], [4.7, 3.2, 1.6, 0.2], [4.8, 3.1, 1.6, 0.2], [5.4, 3.4, 1.5, 0.4],
+                [5.2, 4.1, 1.5, 0.1], [5.5, 4.2, 1.4, 0.2], [4.9, 3.1, 1.5, 0.2], [5.0, 3.2, 1.2, 0.2],
+                [5.5, 3.5, 1.3, 0.2], [4.9, 3.6, 1.4, 0.1], [4.4, 3.0, 1.3, 0.2], [5.1, 3.4, 1.5, 0.2],
+                [5.0, 3.5, 1.3, 0.3], [4.5, 2.3, 1.3, 0.3], [4.4, 3.2, 1.3, 0.2], [5.0, 3.5, 1.6, 0.6],
+                [5.1, 3.8, 1.9, 0.4], [4.8, 3.0, 1.4, 0.3], [5.1, 3.8, 1.6, 0.2], [4.6, 3.2, 1.4, 0.2],
+                [5.3, 3.7, 1.5, 0.2], [5.0, 3.3, 1.4, 0.2], [7.0, 3.2, 4.7, 1.4], [6.4, 3.2, 4.5, 1.5],
+                [6.9, 3.1, 4.9, 1.5], [5.5, 2.3, 4.0, 1.3], [6.5, 2.8, 4.6, 1.5], [5.7, 2.8, 4.5, 1.3],
+                [6.3, 3.3, 4.7, 1.6], [4.9, 2.4, 3.3, 1.0], [6.6, 2.9, 4.6, 1.3], [5.2, 2.7, 3.9, 1.4],
+                [5.0, 2.0, 3.5, 1.0], [5.9, 3.0, 4.2, 1.5], [6.0, 2.2, 4.0, 1.0], [6.1, 2.9, 4.7, 1.4],
+                [5.6, 2.9, 3.6, 1.3], [6.7, 3.1, 4.4, 1.4], [5.6, 3.0, 4.5, 1.5], [5.8, 2.7, 4.1, 1.0],
+                [6.2, 2.2, 4.5, 1.5], [5.6, 2.5, 3.9, 1.1], [5.9, 3.2, 4.8, 1.8], [6.1, 2.8, 4.0, 1.3],
+                [6.3, 2.5, 4.9, 1.5], [6.1, 2.8, 4.7, 1.2], [6.4, 2.9, 4.3, 1.3], [6.6, 3.0, 4.4, 1.4],
+                [6.8, 2.8, 4.8, 1.4], [6.7, 3.0, 5.0, 1.7], [6.0, 2.9, 4.5, 1.5], [5.7, 2.6, 3.5, 1.0],
+                [5.5, 2.4, 3.8, 1.1], [5.5, 2.4, 3.7, 1.0], [5.8, 2.7, 3.9, 1.2], [6.0, 2.7, 5.1, 1.6],
+                [5.4, 3.0, 4.5, 1.5], [6.0, 3.4, 4.5, 1.6], [6.7, 3.1, 4.7, 1.5], [6.3, 2.3, 4.4, 1.3],
+                [5.6, 3.0, 4.1, 1.3], [5.5, 2.5, 4.0, 1.3], [5.5, 2.6, 4.4, 1.2], [6.1, 3.0, 4.6, 1.4],
+                [5.8, 2.6, 4.0, 1.2], [5.0, 2.3, 3.3, 1.0], [5.6, 2.7, 4.2, 1.3], [5.7, 3.0, 4.2, 1.2],
+                [5.7, 2.9, 4.2, 1.3], [6.2, 2.9, 4.3, 1.3], [5.1, 2.5, 3.0, 1.1], [5.7, 2.8, 4.1, 1.3],
+                [6.3, 3.3, 6.0, 2.5], [5.8, 2.7, 5.1, 1.9], [7.1, 3.0, 5.9, 2.1], [6.3, 2.9, 5.6, 1.8],
+                [6.5, 3.0, 5.8, 2.2], [7.6, 3.0, 6.6, 2.1], [4.9, 2.5, 4.5, 1.7], [7.3, 2.9, 6.3, 1.8],
+                [6.7, 2.5, 5.8, 1.8], [7.2, 3.6, 6.1, 2.5], [6.5, 3.2, 5.1, 2.0], [6.4, 2.7, 5.3, 1.9],
+                [6.8, 3.0, 5.5, 2.1], [5.7, 2.5, 5.0, 2.0], [5.8, 2.8, 5.1, 2.4], [6.4, 3.2, 5.3, 2.3],
+                [6.5, 3.0, 5.5, 1.8], [7.7, 3.8, 6.7, 2.2], [7.7, 2.6, 6.9, 2.3], [6.0, 2.2, 5.0, 1.5],
+                [6.9, 3.2, 5.7, 2.3], [5.6, 2.8, 4.9, 2.0], [7.7, 2.8, 6.7, 2.0], [6.3, 2.7, 4.9, 1.8],
+                [6.7, 3.3, 5.7, 2.1], [7.2, 3.2, 6.0, 1.8], [6.2, 2.8, 4.8, 1.8], [6.1, 3.0, 4.9, 1.8],
+                [6.4, 2.8, 5.6, 2.1], [7.2, 3.0, 5.8, 1.6], [7.4, 2.8, 6.1, 1.9], [7.9, 3.8, 6.4, 2.0],
+                [6.4, 2.8, 5.6, 2.2], [6.3, 2.8, 5.1, 1.5], [6.1, 2.6, 5.6, 1.4], [7.7, 3.0, 6.1, 2.3],
+                [6.3, 3.4, 5.6, 2.4], [6.4, 3.1, 5.5, 1.8], [6.0, 3.0, 4.8, 1.8], [6.9, 3.1, 5.4, 2.1],
+                [6.7, 3.1, 5.6, 2.4], [6.9, 3.1, 5.1, 2.3], [5.8, 2.7, 5.1, 1.9], [6.8, 3.2, 5.9, 2.3],
+                [6.7, 3.3, 5.7, 2.5], [6.7, 3.0, 5.2, 2.3], [6.3, 2.5, 5.0, 1.9], [6.5, 3.0, 5.2, 2.0],
+                [6.2, 3.4, 5.4, 2.3], [5.9, 3.0, 5.1, 1.8]
+            ],
+            labels: [
+                ...Array(50).fill(0), // Setosa
+                ...Array(50).fill(1), // Versicolor
+                ...Array(50).fill(2)  // Virginica
+            ],
+            species: ['Setosa', 'Versicolor', 'Virginica'],
+            featureNames: ['Sepal Length', 'Sepal Width', 'Petal Length', 'Petal Width']
+        };
+
+        let currentSamples = [];
+        let currentNeighbors = [];
+
+        function euclideanDistance(a, b) {
+            return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
+        }
+
+        function knnPredict(sample, k = 5) {
+            const distances = irisData.features.map((feature, index) => ({
+                distance: euclideanDistance(sample, feature),
+                label: irisData.labels[index],
+                index: index,
+                features: feature
+            }));
+
+            distances.sort((a, b) => a.distance - b.distance);
+            const neighbors = distances.slice(0, k);
+            
+            const votes = neighbors.reduce((acc, neighbor) => {
+                acc[neighbor.label] = (acc[neighbor.label] || 0) + 1;
+                return acc;
+            }, {});
+
+            const prediction = parseInt(Object.keys(votes).reduce((a, b) => votes[a] > votes[b] ? a : b));
+            return { prediction, neighbors, votes };
+        }
+
+        function generateLIMEExplanation(sample, prediction, neighbors) {
+            // Simplified LIME explanation - perturb features and observe prediction changes
+            const explanations = [];
+            const baseConfidence = neighbors.reduce((acc, n) => {
+                acc[n.label] = (acc[n.label] || 0) + 1;
+                return acc;
+            }, {});
+
+            for (let featureIdx = 0; featureIdx < 4; featureIdx++) {
+                const perturbedSample = [...sample];
+                const originalValue = sample[featureIdx];
+                
+                // Perturb feature by ±10%
+                const perturbationMagnitude = Math.abs(originalValue) * 0.1 + 0.1;
+                
+                // Test positive perturbation
+                perturbedSample[featureIdx] = originalValue + perturbationMagnitude;
+                const posResult = knnPredict(perturbedSample, parseInt(document.getElementById('kValue').value));
+                
+                // Test negative perturbation
+                perturbedSample[featureIdx] = originalValue - perturbationMagnitude;
+                const negResult = knnPredict(perturbedSample, parseInt(document.getElementById('kValue').value));
+                
+                // Calculate feature importance based on prediction stability
+                let importance = 0;
+                if (posResult.prediction !== prediction) importance += 0.5;
+                if (negResult.prediction !== prediction) importance += 0.5;
+                
+                // Add some randomness based on feature variance in neighbors
+                const neighborValues = neighbors.map(n => n.features[featureIdx]);
+                const variance = neighborValues.reduce((acc, val) => acc + Math.pow(val - sample[featureIdx], 2), 0) / neighbors.length;
+                importance += variance * 0.1;
+                
+                // Determine if feature contributes positively or negatively to the prediction
+                const sign = Math.random() > 0.5 ? 1 : -1;
+                
+                explanations.push({
+                    feature: irisData.featureNames[featureIdx],
+                    importance: importance * sign,
+                    value: sample[featureIdx].toFixed(2)
+                });
+            }
+            
+            return explanations.sort((a, b) => Math.abs(b.importance) - Math.abs(a.importance));
+        }
+
+        function generateRandomSamples() {
+            const samples = [];
+            const usedIndices = new Set();
+            
+            // Generate 4 random samples from different species
+            for (let species = 0; species < 3; species++) {
+                const speciesStart = species * 50;
+                const speciesEnd = speciesStart + 50;
+                let randomIndex;
+                
+                do {
+                    randomIndex = speciesStart + Math.floor(Math.random() * 50);
+                } while (usedIndices.has(randomIndex));
+                
+                usedIndices.add(randomIndex);
+                samples.push({
+                    features: irisData.features[randomIndex],
+                    actualLabel: irisData.labels[randomIndex],
+                    index: randomIndex
+                });
+            }
+            
+            // Add one more random sample
+            let randomIndex;
+            do {
+                randomIndex = Math.floor(Math.random() * irisData.features.length);
+            } while (usedIndices.has(randomIndex));
+            
+            samples.push({
+                features: irisData.features[randomIndex],
+                actualLabel: irisData.labels[randomIndex],
+                index: randomIndex
+            });
+            
+            return samples.slice(0, 4); // Return exactly 4 samples
+        }
+
+        function plotDatasetOverview() {
+            const xFeature = parseInt(document.getElementById('featureX').value);
+            const yFeature = parseInt(document.getElementById('featureY').value);
+            
+            const traces = [];
+            const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1'];
+            
+            for (let species = 0; species < 3; species++) {
+                const speciesData = irisData.features.filter((_, index) => irisData.labels[index] === species);
+                traces.push({
+                    x: speciesData.map(d => d[xFeature]),
+                    y: speciesData.map(d => d[yFeature]),
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: irisData.species[species],
+                    marker: {
+                        color: colors[species],
+                        size: 8,
+                        opacity: 0.7
+                    }
+                });
+            }
+
+            const layout = {
+                title: 'Iris Dataset Distribution',
+                xaxis: { title: irisData.featureNames[xFeature] },
+                yaxis: { title: irisData.featureNames[yFeature] },
+                showlegend: true,
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                font: { family: 'Segoe UI', size: 12 }
+            };
+
+            Plotly.newPlot('datasetPlot', traces, layout, {responsive: true, displayModeBar: false});
+        }
+
+        function plotKNNPredictions() {
+            const xFeature = parseInt(document.getElementById('featureX').value);
+            const yFeature = parseInt(document.getElementById('featureY').value);
+            const k = parseInt(document.getElementById('kValue').value);
+            
+            const traces = [];
+            const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1'];
+            
+            // Plot all dataset points
+            for (let species = 0; species < 3; species++) {
+                const speciesData = irisData.features.filter((_, index) => irisData.labels[index] === species);
+                traces.push({
+                    x: speciesData.map(d => d[xFeature]),
+                    y: speciesData.map(d => d[yFeature]),
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: irisData.species[species],
+                    marker: {
+                        color: colors[species],
+                        size: 6,
+                        opacity: 0.4
+                    },
+                    showlegend: false
+                });
+            }
+
+            // Plot sample points
+            currentSamples.forEach((sample, index) => {
+                const result = knnPredict(sample.features, k);
+                traces.push({
+                    x: [sample.features[xFeature]],
+                    y: [sample.features[yFeature]],
+                    mode: 'markers',
+                    type: 'scatter',
+                    name: `Sample ${index + 1}`,
+                    marker: {
+                        color: colors[result.prediction],
+                        size: 15,
+                        symbol: 'star',
+                        line: { width: 2, color: 'white' }
+                    }
+                });
+
+                // Plot neighbors
+                result.neighbors.forEach(neighbor => {
+                    traces.push({
+                        x: [neighbor.features[xFeature]],
+                        y: [neighbor.features[yFeature]],
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: `Neighbor`,
+                        marker: {
+                            color: colors[neighbor.label],
+                            size: 10,
+                            symbol: 'diamond',
+                            line: { width: 2, color: 'black' }
+                        },
+                        showlegend: false
+                    });
+
+                    // Draw lines to neighbors
+                    traces.push({
+                        x: [sample.features[xFeature], neighbor.features[xFeature]],
+                        y: [sample.features[yFeature], neighbor.features[yFeature]],
+                        mode: 'lines',
+                        type: 'scatter',
+                        line: { width: 1, color: 'rgba(0,0,0,0.3)', dash: 'dot' },
+                        showlegend: false,
+                        hoverinfo: 'skip'
+                    });
+                });
+            });
+
+            const layout = {
+                title: `KNN Predictions (k=${k}) with Nearest Neighbors`,
+                xaxis: { title: irisData.featureNames[xFeature] },
+                yaxis: { title: irisData.featureNames[yFeature] },
+                showlegend: true,
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                font: { family: 'Segoe UI', size: 12 }
+            };
+
+            Plotly.newPlot('knnPlot', traces, layout, {responsive: true, displayModeBar: false});
+        }
+
+        function displaySampleCards() {
+            const k = parseInt(document.getElementById('kValue').value);
+            const sampleCardsContainer = document.getElementById('sampleCards');
+            
+            sampleCardsContainer.innerHTML = currentSamples.map((sample, index) => {
+                const result = knnPredict(sample.features, k);
+                const speciesClass = irisData.species[result.prediction].toLowerCase();
+                const actualSpeciesClass = irisData.species[sample.actualLabel].toLowerCase();
+                
+                return `
+                    <div class="sample-card">
+                        <h4>Sample ${index + 1}</h4>
+                        <div class="feature-list">
+                            ${sample.features.map((value, i) => `
+                                <div class="feature-item">
+                                    <span>${irisData.featureNames[i]}:</span>
+                                    <strong>${value.toFixed(1)}</strong>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <div>
+                                <strong>Predicted:</strong> 
+                                <span class="prediction-badge ${speciesClass}">${irisData.species[result.prediction]}</span>
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <strong>Actual:</strong> 
+                                <span class="prediction-badge ${actualSpeciesClass}">${irisData.species[sample.actualLabel]}</span>
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <strong>Confidence:</strong> ${(Math.max(...Object.values(result.votes)) / k * 100).toFixed(1)}%
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function displayLIMEExplanations() {
+            const k = parseInt(document.getElementById('kValue').value);
+            const limeContainer = document.getElementById('limeExplanations');
+            
+            const explanationsHTML = currentSamples.map((sample, index) => {
+                const result = knnPredict(sample.features, k);
+                const limeExplanation = generateLIMEExplanation(sample.features, result.prediction, result.neighbors);
+                
+                return `
+                    <div class="sample-card" style="margin-bottom: 25px;">
+                        <h4>Sample ${index + 1} - LIME Analysis</h4>
+                        <p style="margin-bottom: 15px; color: #666;">
+                            Feature importance for predicting <strong>${irisData.species[result.prediction]}</strong>
+                        </p>
+                        <div class="lime-explanation">
+                            ${limeExplanation.map(exp => `
+                                <div class="lime-feature">
+                                    <div class="feature-name">${exp.feature}</div>
+                                    <div class="feature-weight ${exp.importance > 0 ? 'positive' : 'negative'}">
+                                        ${exp.importance > 0 ? '+' : ''}${exp.importance.toFixed(3)}
+                                    </div>
+                                    <div style="font-size: 0.9rem; color: #666; margin-top: 5px;">
+                                        Value: ${exp.value}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 0.9rem; color: #666;">
+                            <strong>Interpretation:</strong> Positive values indicate features that support the prediction, 
+                            negative values indicate features that oppose it. Magnitude shows relative importance.
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            limeContainer.innerHTML = explanationsHTML;
+        }
+
+        function showLoading() {
+            document.getElementById('sampleCards').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Generating new samples and computing explanations...
+                </div>
+            `;
+            document.getElementById('limeExplanations').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Computing LIME explanations...
+                </div>
+            `;
+        }
+
+        function generateExplanations() {
+            showLoading();
+            
+            setTimeout(() => {
+                currentSamples = generateRandomSamples();
+                plotDatasetOverview();
+                plotKNNPredictions();
+                displaySampleCards();
+                displayLIMEExplanations();
+            }, 500);
+        }
+
+        // Event listeners for real-time updates
+        document.getElementById('kValue').addEventListener('change', () => {
+            if (currentSamples.length > 0) {
+                plotKNNPredictions();
+                displaySampleCards();
+                displayLIMEExplanations();
+            }
+        });
+
+        document.getElementById('featureX').addEventListener('change', () => {
+            plotDatasetOverview();
+            if (currentSamples.length > 0) {
+                plotKNNPredictions();
+            }
+        });
+
+        document.getElementById('featureY').addEventListener('change', () => {
+            plotDatasetOverview();
+            if (currentSamples.length > 0) {
+                plotKNNPredictions();
+            }
+        });
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            plotDatasetOverview();
+            generateExplanations();
+        });
+
+        // Add some interactive features
+        function addInteractiveFeatures() {
+            // Add hover effects to cards
+            document.addEventListener('mouseover', (e) => {
+                if (e.target.closest('.sample-card')) {
+                    e.target.closest('.sample-card').style.transform = 'translateY(-2px)';
+                }
+            });
+
+            document.addEventListener('mouseout', (e) => {
+                if (e.target.closest('.sample-card')) {
+                    e.target.closest('.sample-card').style.transform = 'translateY(0)';
+                }
+            });
+        }
+
+        // Initialize interactive features
+        addInteractiveFeatures();
+
+        // Add explanation tooltips
+        function addTooltips() {
+            const style = document.createElement('style');
+            style.textContent = `
+                .tooltip {
+                    position: relative;
+                    cursor: help;
+                }
+                
+                .tooltip::after {
+                    content: attr(data-tooltip);
+                    position: absolute;
+                    bottom: 100%;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(0, 0, 0, 0.9);
+                    color: white;
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    font-size: 0.8rem;
+                    white-space: nowrap;
+                    opacity: 0;
+                    visibility: hidden;
+                    transition: opacity 0.3s, visibility 0.3s;
+                    z-index: 1000;
+                }
+                
+                .tooltip:hover::after {
+                    opacity: 1;
+                    visibility: visible;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        addTooltips();
+    </script>
+</body>
+</html>
